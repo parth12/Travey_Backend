@@ -6,6 +6,8 @@ var editProfile = require('config/editProfile');
 var reportAdd = require('config/reportAdd');
 var models = require('config/models');
 var locationRefresh = require('config/locationRefresh');
+var upvoteDownvote = require('config/upvoteDownvote');
+var historyAdd = require('config/historyAdd');
 var fs = require('fs');
 var distance = 1000/6371;
 
@@ -71,9 +73,9 @@ module.exports = function(app) {
 
 	app.post('/register',function(req,res){
 		//var desti = JSON.parse(req.body.history);
-		var lat = req.body.lat;
+		/*var lat = req.body.lat;
 		var long = req.body.long;
-		var history = req.body.history;
+		var history = req.body.history;*/
 		var user_name = req.body.user_name;
 		var phone_number = req.body.phone_number;
 		var email = req.body.email;
@@ -81,7 +83,7 @@ module.exports = function(app) {
         var gcm_id = req.body.gcm_id;
 
 			
-		register.register(user_name,phone_number,email,password,history,lat, long,gcm_id,function (found) {
+		register.register(user_name,phone_number,email,password,gcm_id,function (found) {
 			console.log(found);
 			//console.log(desti[0].destination);
 			res.json(found);
@@ -183,7 +185,6 @@ module.exports = function(app) {
 		models.User.find({phone_number: req.body.phone_number},function(err,users){
 
 				var len = users.length;
-
 				if(len == 0){
 				 	res.json({'response':"yes"});
 				}else{
@@ -191,6 +192,23 @@ module.exports = function(app) {
 					res.json({'response':"no"});
 				}
 			});
+	});
+
+	app.post('/getRating', function(req, res) {
+	
+		models.User.find({phone_number: req.body.phone_number},function(err,users){
+
+				var len = users.length;
+				if(len != 0){
+					var rating = users[0].upvotes - users[0].downvotes;
+					console.log(rating);
+				 	res.json({'rating':rating});
+				}else{
+
+					res.json({'rating':"no"});
+				}
+			});
+		
 	});
 
 	app.post('/editProfile/phone_number', function(req, res) {
@@ -207,6 +225,7 @@ module.exports = function(app) {
 
 	app.post('/editProfile/shared_location', function(req, res) {
 	
+
 		var phone_number = req.body.phone_number;
 		var shared_location = req.body.shared_location;
 		
@@ -285,6 +304,16 @@ module.exports = function(app) {
 	});
 
 
+	app.post('/getGcm',function(req,res){
+		var gcm;
+   		models.User.find({phone_number : req.body.phone_number},function(err,reports){
+     		console.log(reports.length);
+			res.json({'gcm_id': reports[0].gcm_id});
+			console.log(reports[0].gcm_id);
+   		});
+   		//res.json({'gcm_id': gcm});
+	});
+
 
 	app.post('/allContacts',function(req,res){
    		models.User.find({},function(err,reports){
@@ -293,6 +322,24 @@ module.exports = function(app) {
       	res.json(reports);
    	});
 	});
+
+	app.post('/getUpvotes',function(req,res){
+   		models.Report.find({_id: req.body.reportId},function(err,reports){
+     	console.log(reports);
+
+      	res.json({'upvotes':reports[0].upvotes});
+   	});
+	});
+
+	app.post('/getDownvotes',function(req,res){
+   		models.Report.find({_id: req.body.reportId},function(err,reports){
+     	console.log(reports);
+
+      	res.json({'downvotes':reports[0].downvotes});
+   	});
+	});
+
+
 
 app.post('/reportNearBy',function(req,res){
    var query = models.Report.find({'location': {
@@ -319,9 +366,9 @@ app.post('/reportNearBy',function(req,res){
 app.post('/friendsNearBy',function(req,res){
    var query = models.User.find({'location': {
       $near: [req.body.lat,req.body.long],
-      $maxDistance: distance
-   }
-   });
+      $maxDistance: distance}
+  },
+  {'shared_location':"1"} );
 
    query.exec(function (err, city) {
       if (err) {
@@ -338,6 +385,13 @@ app.post('/friendsNearBy',function(req,res){
 });
 
 
+app.post('/getMyLocation',function(req,res){
+	models.User.find({'phone_number': req.body.phone_number}, function(error,reports){
+		
+			res.json(reports[0].location);
+		});
+
+});
 
 app.post('/getLocation',function(req,res){
 	models.User.find({'phone_number': req.body.phone_number}, function(error,reports){
@@ -376,72 +430,31 @@ app.post('/shareLocation',function(req,res){
 
 
 app.post('/reportUpVote',function(req,res){
-   models.Report.find({_id:req.body.reportId},function(error, reports){
-      reports[0].upvotes=reports[0].upvotes+1;
-      reports[0].save(function(err,resp) {
-        if(err) {
-            console.log(err);
-            
-        } else {
-            console.log("done");
-        }
-    });
-      var phone_number=reports[0].phone_number;
-      models.User.find({phone_number:phone_number},function(err,users){
-      	console.log(users[0]);
-         var up=users[0].upvotes;
-         users[0].upvotes=up+1;
-         users[0].save(function(err,resp) {
-        if(err) {
-            console.log(err);
-            
-        } else {
-            console.log("done");
-        }
-    });
-      });
-   });
-   res.json({'response' : "upvote ho gya"});
+	var phone_number = req.body.phone_number;
+	var report_id = req.body.reportId;
+
+	upvoteDownvote.upvote(phone_number, report_id, function(err, found){
+		res.json(found);
+		console.log(found);
+	});
+	
 });
+
+
 app.post('/reportDownVote',function(req,res){
-   models.Report.find({_id:req.body.reportId},function(error, reports){
-      reports[0].downvotes=reports[0].downvotes+1;
-      reports[0].save(function(err,resp) {
-        if(err) {
-            console.log(err);
-            
-        } else {
-            console.log("done");
-        }
-    });
-      var phone_number=reports[0].phone_number;
-      models.User.find({phone_number:phone_number},function(err,users){
-                var down=users[0].downvotes;
-  				users[0].downvotes=down+1;
-         if(users[0].upvotes - users[0].downvotes < -10){
-         	users[0].allowed_to_post = "0";
+	var phone_number = req.body.phone_number;
+	var report_id = req.body.reportId;
 
-         	var fromu = "req.body.phone_number";
-   			var fromn = "req.body.fromn";
-   						
-			var title = "Now you are not allowed to post";
-
-			requests.send(fromn, fromu, title,users[0].gcm_id, function (found) {
-      			console.log(users[0].phone_number + "  not allowed to post");
-      			res.json(found);
-      		});	
-         }
-         	
-         users[0].save();
-      });
-   });
-   res.json({'response': "downvote ho gya"});
+	upvoteDownvote.downvote(phone_number, report_id, function(err, found){
+		res.json(found);
+		console.log(found);
+	});
 });
 
 app.post('/leaderBoard',function(req,res) {
    var options = {
       "limit": 20,
-      "sort": [['upvotes', 'desc'], ['downvotes', 'asc']]
+      "sort": ['upvotes', 'desc']
    };
 
    models.User.find({}, function (err, docs) {
@@ -460,7 +473,7 @@ app.post('/history', function(req,res){
 
 app.post('/getImage', function(req, res){
 	models.User.find({phone_number : req.body.phone_number}, function(err, users){
-			res.json(users[0].image);
+			//res.json(users[0].image);
 			//console.log(users[0].image);
 	});
 });
@@ -480,6 +493,13 @@ app.post('/shareLocationWithFriend', function(req, res){
       		});	
 			//res.json(users[0].image);
 			//console.log(users[0].image);
+	});
+});
+
+app.post('/checkAllowedToPost', function(req, res){
+	models.User.find({phone_number : req.body.phone_number}, function(err, users){
+			res.json({'res': users[0].allowed_to_post});
+			console.log(res);
 	});
 });
 
