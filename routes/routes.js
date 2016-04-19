@@ -105,8 +105,8 @@ module.exports = function(app) {
 
 			
 		reportAdd.reportAdd(phone_number,detail,tag,start_time,end_time,lat,long,function (found) {
-			console.log(found);
-			console.log(phone_number);
+			//console.log(found);
+			//console.log(phone_number);
 			res.json(found);
 	});		
 	});
@@ -267,7 +267,7 @@ module.exports = function(app) {
 
 		historyAdd.historyAdd(phone_number,history,function (found) {
 			console.log(found);
-			//res.json(found);
+			res.json(found);
 		});
 	});
 
@@ -366,9 +366,8 @@ app.post('/reportNearBy',function(req,res){
 app.post('/friendsNearBy',function(req,res){
    var query = models.User.find({'location': {
       $near: [req.body.lat,req.body.long],
-      $maxDistance: distance}
-  },
-  {'shared_location':"1"} );
+      $maxDistance: distance},'shared_location':"1"
+  } );
 
    query.exec(function (err, city) {
       if (err) {
@@ -385,6 +384,9 @@ app.post('/friendsNearBy',function(req,res){
 });
 
 
+
+
+
 app.post('/getMyLocation',function(req,res){
 	models.User.find({'phone_number': req.body.phone_number}, function(error,reports){
 		
@@ -398,17 +400,9 @@ app.post('/getLocation',function(req,res){
 		if(reports[0].shared_location == "1"){
 			res.json(reports[0].location);
 		}else{
-			var fromu = "req.body.phone_number";
-   			var fromn = "req.body.fromn";
-   						
-			var title = "Share your location";
-
-			requests.send(fromn, fromu, title,reports[0].gcm_id, function (found) {
-      			console.log("location send");
-      			res.json(found);
-      		});	
+			res.json([0,0]);
 		}
-		res.json();
+		//
 	});
 });
 
@@ -447,7 +441,7 @@ app.post('/reportDownVote',function(req,res){
 
 	upvoteDownvote.downvote(phone_number, report_id, function(err, found){
 		res.json(found);
-		console.log(found);
+		//console.log(found);
 	});
 });
 
